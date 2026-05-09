@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Disagreement Mapper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #F5F2EB; --paper: #FDFAF4; --ink: #1A1814; --ink2: #6B6760;
+    --ink3: #A8A49E; --rule: #E2DDD6; --a: #2C4A8C; --a-bg: #EBF0FB;
+    --b: #7A2A1A; --b-bg: #FBEDE9; --crux: #1A4A2E; --crux-bg: #E8F5ED;
+    --shared: #4A3A1A; --shared-bg: #F5EFE0; --type: #3A1A5C; --type-bg: #F0EAF8;
+  }
+  body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--ink); min-height: 100vh; padding: 0; }
+  header { border-bottom: 1px solid var(--rule); padding: 2rem 2.5rem 1.5rem; background: var(--paper); display: flex; align-items: baseline; gap: 1.5rem; }
+  header h1 { font-family: 'DM Serif Display', serif; font-size: 1.75rem; font-weight: 400; letter-spacing: -0.02em; }
+  header p { font-size: 0.7rem; color: var(--ink3); letter-spacing: 0.08em; text-transform: uppercase; }
+  .main { max-width: 900px; margin: 0 auto; padding: 2rem 2rem 4rem; }
+  .api-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 1.75rem; background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 0.6rem 0.875rem; }
+  .api-bar label { font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink3); white-space: nowrap; }
+  .api-bar input { flex: 1; background: transparent; border: none; outline: none; font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--ink); }
+  .api-bar input::placeholder { color: var(--ink3); }
+  .key-status { width: 6px; height: 6px; border-radius: 50%; background: var(--ink3); flex-shrink: 0; }
+  .key-status.active { background: #2A7A3A; }
+  .inputs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  @media (max-width: 640px) { .inputs-grid { grid-template-columns: 1fr; } }
+  .input-block { background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+  .input-header { display: flex; align-items: center; gap: 8px; padding: 0.6rem 0.875rem; border-bottom: 1px solid var(--rule); }
+  .side-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot-a { background: var(--a); } .dot-b { background: var(--b); }
+  .input-header span { font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink2); }
+  .char-count { margin-left: auto; font-size: 0.65rem; color: var(--ink3); }
+  textarea { width: 100%; min-height: 160px; background: transparent; border: none; outline: none; resize: vertical; font-family: 'DM Mono', monospace; font-size: 0.78rem; line-height: 1.7; color: var(--ink); padding: 0.875rem; }
+  textarea::placeholder { color: var(--ink3); font-style: italic; }
+  .action-row { display: flex; justify-content: center; margin: 1.25rem 0; }
+  button.analyze { font-family: 'DM Mono', monospace; font-size: 0.8rem; letter-spacing: 0.06em; background: var(--ink); color: var(--bg); border: none; border-radius: 4px; padding: 0.7rem 2rem; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: opacity 0.15s; }
+  button.analyze:hover { opacity: 0.85; } button.analyze:disabled { opacity: 0.4; cursor: not-allowed; }
+  .spinner { width: 14px; height: 14px; border: 1.5px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; display: none; }
+  .loading .spinner { display: block; } .loading .btn-text::after { content: '...'; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-msg { background: #FBE8E8; color: #7A2020; font-size: 0.75rem; padding: 0.75rem 1rem; border-radius: 6px; margin-bottom: 1rem; display: none; }
+  .error-msg.visible { display: block; }
+  .output { display: none; flex-direction: column; gap: 0; background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+  .output.visible { display: flex; }
+  .out-section { padding: 1rem 1.125rem; border-bottom: 1px solid var(--rule); animation: fadeIn 0.35s ease both; }
+  .out-section:last-child { border-bottom: none; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .out-tag { display: inline-block; font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 500; padding: 2px 7px; border-radius: 3px; margin-bottom: 0.5rem; }
+  .tag-type { background: var(--type-bg); color: var(--type); }
+  .tag-crux { background: var(--crux-bg); color: var(--crux); }
+  .tag-shared { background: var(--shared-bg); color: var(--shared); }
+  .tag-a { background: var(--a-bg); color: var(--a); }
+  .tag-b { background: var(--b-bg); color: var(--b); }
+  .tag-resolve { background: #F0F0F0; color: #444; }
+  .out-main { font-family: 'DM Serif Display', serif; font-size: 1rem; line-height: 1.5; color: var(--ink); margin-bottom: 0.3rem; }
+  .out-sub { font-size: 0.73rem; line-height: 1.65; color: var(--ink2); }
+  .resolvable-row { display: flex; align-items: center; gap: 8px; }
+  .resolve-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .resolve-yes { background: #2A7A3A; } .resolve-no { background: #C04030; }
+  footer { text-align: center; padding: 2rem; font-size: 0.65rem; color: var(--ink3); letter-spacing: 0.06em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Disagreement Mapper</h1>
+  <p>Find the real crux — not just the two sides</p>
+</header>
+<div class="main">
+
+  <!-- ======================================================
+       YOUR API KEY: paste it into the box below when you
+       open this file in a browser. It starts with "AIza..."
+       Get it free at: aistudio.google.com → Get API Key
+       ====================================================== -->
+  <div class="api-bar">
+    <label>Gemini API Key</label>
+    <input type="password" id="apiKey" placeholder="gsk_... (paste your Groq key here)" value="" />
+    <div class="key-status" id="keyStatus"></div>
+  </div>
+
+  <div class="inputs-grid">
+    <div class="input-block">
+      <div class="input-header">
+        <div class="side-dot dot-a"></div>
+        <span>Side A</span>
+        <span class="char-count" id="countA">0</span>
+      </div>
+      <textarea id="textA" placeholder="Paste the first argument, article, or take here..."></textarea>
+    </div>
+    <div class="input-block">
+      <div class="input-header">
+        <div class="side-dot dot-b"></div>
+        <span>Side B</span>
+        <span class="char-count" id="countB">0</span>
+      </div>
+      <textarea id="textB" placeholder="Paste the opposing argument, article, or take here..."></textarea>
+    </div>
+  </div>
+
+  <div class="action-row">
+    <button class="analyze" id="analyzeBtn" onclick="analyze()">
+      <div class="spinner"></div>
+      <span class="btn-text">Map the disagreement</span>
+    </button>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="output" id="output">
+    <div class="out-section" style="animation-delay:0.05s">
+      <div class="out-tag tag-type">Disagreement type</div>
+      <div class="out-main" id="outType"></div>
+      <div class="out-sub" id="outTypeSub"></div>
+    </div>
+    <div class="out-section" style="animation-delay:0.1s">
+      <div class="out-tag tag-crux">The real crux</div>
+      <div class="out-main" id="outCrux"></div>
+      <div class="out-sub" id="outCruxSub"></div>
+    </div>
+    <div class="out-section" style="animation-delay:0.15s">
+      <div class="out-tag tag-shared">Common ground</div>
+      <div class="out-main" id="outShared"></div>
+    </div>
+    <div class="out-section" style="animation-delay:0.2s">
+      <div class="out-tag tag-a">Steelman — Side A</div>
+      <div class="out-sub" id="outSteelA"></div>
+    </div>
+    <div class="out-section" style="animation-delay:0.25s">
+      <div class="out-tag tag-b">Steelman — Side B</div>
+      <div class="out-sub" id="outSteelB"></div>
+    </div>
+    <div class="out-section" style="animation-delay:0.3s">
+      <div class="out-tag tag-resolve">Resolvable by evidence?</div>
+      <div class="resolvable-row">
+        <div class="resolve-dot" id="resolveDot"></div>
+        <div class="out-sub" id="outResolve"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<footer>Built for the AI challenge &mdash; disagreement-mapper</footer>
+
+<script>
+const TYPE_LABELS = {
+  empirical:    'Empirical — a factual dispute',
+  values:       'Values — different priorities',
+  definitional: 'Definitional — same words, different meanings',
+  prediction:   'Prediction — disagreement about the future',
+  mixed:        'Mixed — multiple kinds of disagreement'
+};
+const TYPE_SUBS = {
+  empirical:    'New evidence could settle this. The disagreement is about what is true.',
+  values:       "Evidence alone won't settle this. They want different things.",
+  definitional: 'They may actually agree once terms are clarified.',
+  prediction:   "Neither side can be proven right yet — only time will tell.",
+  mixed:        'This disagreement has multiple layers; untangling them is the first step.'
+};
+
+document.getElementById('textA').addEventListener('input', function() {
+  document.getElementById('countA').textContent = this.value.length;
+});
+document.getElementById('textB').addEventListener('input', function() {
+  document.getElementById('countB').textContent = this.value.length;
+});
+document.getElementById('apiKey').addEventListener('input', function() {
+  document.getElementById('keyStatus').classList.toggle('active', this.value.startsWith('gsk_'));
+});
+
+async function analyze() {
+  const key   = document.getElementById('apiKey').value.trim();
+  const textA = document.getElementById('textA').value.trim();
+  const textB = document.getElementById('textB').value.trim();
+  const btn   = document.getElementById('analyzeBtn');
+  const err   = document.getElementById('errorMsg');
+
+  err.classList.remove('visible');
+  if (!key)             return showError('Paste your Gemini API key into the box at the top. Get one free at aistudio.google.com');
+  if (!textA || !textB) return showError('Both sides need text before you can map the disagreement.');
+
+  btn.disabled = true;
+  btn.classList.add('loading');
+  document.getElementById('output').classList.remove('visible');
+
+  const prompt = `You are an expert at analysing disagreements. Given two opposing texts, return a JSON object with exactly these fields (no markdown, no backticks, just raw JSON) IMPORTANT: Your entire response must be ONLY the JSON object. No intro text, no explanation, no markdown. Start your response with { and end with }:
+
+{
+  "type": one of: "empirical" | "values" | "definitional" | "prediction" | "mixed",
+  "crux": one crisp sentence — the single underlying belief that, if changed, would most shift one side's position,
+  "crux_detail": "1-2 sentences expanding on why this is the real crux",
+  "shared_ground": "one sentence — something both sides genuinely agree on",
+  "steelman_a": "2-3 sentences — the strongest possible version of Side A's argument",
+  "steelman_b": "2-3 sentences — the strongest possible version of Side B's argument",
+  "resolvable": true or false,
+  "resolve_note": "one sentence explaining the resolvability verdict"
+}
+
+Be incisive. Don't summarise — analyse.
+
+SIDE A:
+${textA}
+
+SIDE B:
+${textB}`;
+
+  try {
+    const res = await fetch(
+  'https://api.groq.com/openai/v1/chat/completions',
+  {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${key}`
+    },
+    body: JSON.stringify({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 1000
+    })
+  }
+);
+
+if (!res.ok) {
+  const errData = await res.json();
+  throw new Error(errData.error?.message || `API error ${res.status}`);
+}
+
+const data = await res.json();
+const raw  = data.choices?.[0]?.message?.content || '';
+    const clean = raw
+  .replace(/```json|```/g, '')
+  .replace(/[\x00-\x1F\x7F]/g, ' ')
+  .trim();
+
+const jsonMatch = clean.match(/\{[\s\S]*\}/);
+if (!jsonMatch) throw new Error('AI did not return valid JSON. Try again.');
+const parsed = JSON.parse(jsonMatch[0]);
+    renderOutput(parsed);
+
+  } catch (e) {
+    showError(e.message || 'Something went wrong. Check your API key and try again.');
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+}
+
+function renderOutput(d) {
+  document.getElementById('outType').textContent    = TYPE_LABELS[d.type] || d.type;
+  document.getElementById('outTypeSub').textContent = TYPE_SUBS[d.type]   || '';
+  document.getElementById('outCrux').textContent    = d.crux;
+  document.getElementById('outCruxSub').textContent = d.crux_detail;
+  document.getElementById('outShared').textContent  = d.shared_ground;
+  document.getElementById('outSteelA').textContent  = d.steelman_a;
+  document.getElementById('outSteelB').textContent  = d.steelman_b;
+  const dot = document.getElementById('resolveDot');
+  dot.className = 'resolve-dot ' + (d.resolvable ? 'resolve-yes' : 'resolve-no');
+  document.getElementById('outResolve').textContent =
+    (d.resolvable ? 'Yes — ' : 'No — ') + d.resolve_note;
+  document.getElementById('output').classList.add('visible');
+  document.getElementById('output').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.classList.add('visible');
+}
+</script>
+</body>
+</html>
